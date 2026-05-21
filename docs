@@ -1,1 +1,126 @@
+# Chatbot Architecture
 
+## Overview
+This project is a Python-based chatbot system designed to simulate conversational interaction between a user and a computer program.
+
+The chatbot initially follows a rule-based architecture and is being progressively enhanced with AI and NLP capabilities using local LLM technologies such as Ollama.
+
+---
+
+# System Flow
+
+User Input
+↓
+Input Preprocessing
+↓
+Intent/Keyword Matching
+↓
+Response Generation
+↓
+Output Display
+
+---
+
+# Architecture Components
+
+## 1. User Interaction Layer
+Handles communication between the user and the chatbot.
+
+### Responsibilities
+- Accept user input
+- Display chatbot responses
+- Maintain conversation loop
+
+### Technologies
+- Python CLI (initial phase)
+
+---
+
+## 2. Input Processing Layer
+Processes and normalizes user input before analysis.
+
+### Operations
+- Lowercase conversion
+- Whitespace removal
+- Text normalization
+
+### Purpose
+Improves matching consistency and response accuracy.
+
+---
+
+## 3. Rule-Based Engine
+Core decision-making component in the initial chatbot version.
+
+### Responsibilities
+- Keyword matching
+- Conditional response handling
+- Intent mapping
+
+### Example
+User input:
+"hello"
+
+Mapped response:
+"Hi there!"
+
+---
+
+## 4. Response Generation Layer
+Generates chatbot output based on processed input and matching logic.
+
+### Current Approach
+- Predefined responses
+- Dictionary-based mapping
+
+### Future Improvements
+- AI-generated responses
+- Context-aware interactions
+- NLP-based response generation
+
+---
+
+## 5. Data Management Layer
+Handles chatbot data storage and configuration.
+
+### Current Usage
+- JSON files
+- Response datasets
+- User interaction logs
+
+### Future Scope
+- Conversation memory
+- Persistent storage
+- Database integration
+
+---
+
+# Future Architecture Enhancements
+
+## Planned Improvements
+- Ollama integration
+- Local LLM support
+- NLP pipelines
+- Context management
+- Web-based UI
+- API integration
+
+---
+
+# Design Goals
+
+- Modular architecture
+- Scalability
+- Maintainability
+- Extensibility
+- Efficient response handling
+
+---
+
+# Technologies Used
+
+- Python
+- JSON
+- VS Code
+- Git & GitHub
+- Ollama (in progress)
