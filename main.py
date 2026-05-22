@@ -1,4 +1,7 @@
 import ollama
+SYSTEM_PROMPT = {
+    "role": "system",
+    "content": """You are the user's personal AI assistant named 'Buddy'. You are helpful, friendly and concise in your responses. You always greet the user warmly and answer questions clearly. If you don't know something, you honestly say so."""}
 
 def get_response(user_input: str, history: list) -> str:
     history.append({
@@ -21,7 +24,7 @@ def get_response(user_input: str, history: list) -> str:
 
 def main():
     print("🤖 ChatBot is running! Type 'quit' to exit.\n")
-    history = []
+    history = [SYSTEM_PROMPT]
     while True:
         user_input = input("You: ").strip()
         if not user_input:
