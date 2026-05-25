@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify
 import ollama
 import json
 import os
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -35,13 +36,18 @@ def chat():
 
     user_message = request.json.get("message")
 
-    # Add user message
+    # SAVE USER MESSAGE
     conversation_history.append({
         "role": "user",
-        "content": user_message
+        "content": user_message,
+        "time": datetime.now().strftime("%H:%M:%S")
     })
 
-    # ONLY LAST 6 MESSAGES
+    # LIMIT MEMORY SIZE
+    if len(conversation_history) > 100:
+        conversation_history = conversation_history[-100:]
+
+    # ONLY SEND RECENT MESSAGES TO AI
     recent_messages = conversation_history[-6:]
 
     # AI RESPONSE
@@ -52,18 +58,37 @@ def chat():
 
     bot_reply = response["message"]["content"]
 
-    # Save bot reply
+    # SAVE BOT REPLY
     conversation_history.append({
         "role": "assistant",
-        "content": bot_reply
+        "content": bot_reply,
+        "time": datetime.now().strftime("%H:%M:%S")
     })
 
-    # SAVE MEMORY TO JSON
+    # SAVE TO JSON FILE
     with open(MEMORY_FILE, "w") as f:
         json.dump(conversation_history, f, indent=4)
 
     return jsonify({
         "response": bot_reply
+    })
+
+
+# CLEAR MEMORY ROUTE
+@app.route("/clear", methods=["GET"])
+def clear_memory():
+
+    global conversation_history
+
+    # RESET MEMORY
+    conversation_history = [SYSTEM_PROMPT]
+
+    # SAVE EMPTY MEMORY
+    with open(MEMORY_FILE, "w") as f:
+        json.dump(conversation_history, f, indent=4)
+
+    return jsonify({
+        "status": "Memory Cleared Successfully"
     })
 
 
