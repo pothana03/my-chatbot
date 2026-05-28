@@ -27,18 +27,18 @@
             height: 600px;
             background: #16213e;
             border-radius: 20px;
-            overflow: hidden;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
             box-shadow: 0 20px 60px rgba(0,0,0,0.5);
         }
 
         .chat-header {
             background: #0f3460;
-            color: white;
-            text-align: center;
             padding: 20px;
-            font-size: 22px;
+            text-align: center;
+            color: white;
+            font-size: 20px;
             font-weight: bold;
         }
 
@@ -59,9 +59,10 @@
             max-width: 80%;
             padding: 12px 16px;
             border-radius: 18px;
-            color: white;
             font-size: 14px;
             line-height: 1.5;
+            color: white;
+            word-wrap: break-word;
         }
 
         .user-message {
@@ -88,19 +89,20 @@
                 padding: 12px 16px;
                 border: none;
                 border-radius: 25px;
-                outline: none;
                 background: #1a1a2e;
                 color: white;
                 font-size: 14px;
+                outline: none;
             }
 
             .chat-input button {
                 padding: 12px 20px;
-                border: none;
-                border-radius: 25px;
                 background: #e94560;
                 color: white;
+                border: none;
+                border-radius: 25px;
                 cursor: pointer;
+                font-size: 14px;
                 font-weight: bold;
             }
 
@@ -121,7 +123,7 @@
         <div class="chat-messages" id="chatMessages">
 
             <div class="message bot-message">
-                Hi! I'm Buddy, your personal AI assistant 😊
+                Hi! I'm Buddy. How can I help you today?
             </div>
 
         </div>
@@ -130,10 +132,9 @@
 
             <input type="text"
                    id="userInput"
-                   placeholder="Type a message..."
-                   autocomplete="off">
+                   placeholder="Type a message..." />
 
-            <button type="button" onclick="sendMessage()">
+            <button onclick="sendMessage()">
                 Send
             </button>
 
@@ -143,80 +144,95 @@
 
     <script>
 
-        const input = document.getElementById("userInput");
-        const messages = document.getElementById("chatMessages");
+    const input = document.getElementById("userInput");
 
-        // Enter key support
-        input.addEventListener("keydown", function(event){
+    const messages = document.getElementById("chatMessages");
 
-            if(event.key === "Enter"){
-                event.preventDefault();
-                sendMessage();
-            }
+
+    input.addEventListener("keypress", function(e){
+
+        if(e.key === "Enter"){
+            sendMessage();
+        }
+
+    });
+
+
+    async function sendMessage(){
+
+        const userText = input.value.trim();
+
+        if(!userText) return;
+
+
+        // USER MESSAGE
+        appendMessage(userText, "user-message");
+
+        input.value = "";
+
+
+        // CREATE EMPTY BOT MESSAGE
+        const botDiv = document.createElement("div");
+
+        botDiv.className = "message bot-message";
+
+        botDiv.textContent = "";
+
+        messages.appendChild(botDiv);
+
+        messages.scrollTop = messages.scrollHeight;
+
+
+        // SEND TO BACKEND
+        const response = await fetch("/chat", {
+
+            method:"POST",
+
+            headers:{
+                "Content-Type":"application/json"
+            },
+
+            body:JSON.stringify({
+                message:userText
+            })
 
         });
 
-        // Append message
-        function appendMessage(text, className){
 
-            const div = document.createElement("div");
+        // STREAM RESPONSE
+        const reader = response.body.getReader();
 
-            div.className = "message " + className;
+        const decoder = new TextDecoder();
 
-            div.innerText = text;
 
-            messages.appendChild(div);
+        while(true){
+
+            const {done, value} = await reader.read();
+
+            if(done) break;
+
+            const chunk = decoder.decode(value);
+
+            botDiv.textContent += chunk;
 
             messages.scrollTop = messages.scrollHeight;
         }
 
-        // Send message
-        async function sendMessage(){
+    }
 
-            const userText = input.value.trim();
 
-            if(userText === ""){
-                return;
-            }
+    function appendMessage(text, className){
 
-            // Show user message
-            appendMessage(userText, "user-message");
+        const div = document.createElement("div");
 
-            // Clear input
-            input.value = "";
+        div.className = `message ${className}`;
 
-            try{
+        div.textContent = text;
 
-                const response = await fetch("/chat", {
+        messages.appendChild(div);
 
-                    method: "POST",
-
-                    headers:{
-                        "Content-Type":"application/json"
-                    },
-
-                    body: JSON.stringify({
-                        message: userText
-                    })
-
-                });
-
-                const data = await response.json();
-
-                // Show bot reply
-                appendMessage(data.response, "bot-message");
-
-            }
-
-            catch(error){
-
-                appendMessage("Server error!", "bot-message");
-
-                console.log(error);
-
-            }
-
-        }
+        messages.scrollTop = messages.scrollHeight;
+    }
 
     </script>
 
