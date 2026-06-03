@@ -1,98 +1,120 @@
 from flask import Flask, render_template, request, Response
 import ollama
-import json
-import os
+import sqlite3
 from datetime import datetime
 
 app = Flask(__name__)
 
-# ---------------- SYSTEM PROMPT ----------------
+# DATABASE FILE
+DATABASE = "chatbot.db"
+
+# SYSTEM PROMPT
 SYSTEM_PROMPT = {
     "role": "system",
-    "content": "You are Buddy, a helpful assistant. Reply briefly and clearly."
+    "content": """
+You are Buddy, a helpful AI assistant.
+
+Rules:
+1. Answer only the user's question.
+2. Keep answers short and relevant.
+3. Never introduce unrelated topics.
+4. If greeted with 'Hi', 'Hello', or similar greetings, respond with a friendly greeting.
+5. If the question is unclear, ask for clarification.
+6. If you don't know something, say so.
+7. Maintain conversation context when relevant.
+"""
 }
 
-# ---------------- MEMORY FILE ----------------
-MEMORY_FILE = "memory.json"
 
-# ---------------- LOAD MEMORY ----------------
-if os.path.exists(MEMORY_FILE):
-    with open(MEMORY_FILE, "r") as f:
-        conversation_history = json.load(f)
-else:
-    conversation_history = [SYSTEM_PROMPT]
+# CREATE DATABASE TABLE
+def init_db():
 
-# ---------------- LONG TERM MEMORY ----------------
-memory_summary = ""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            role TEXT,
+            content TEXT,
+            timestamp TEXT
+        )
+    """)
+
+    conn.commit()
+    conn.close()
 
 
-# ---------------- HOME ----------------
 @app.route("/")
 def home():
     return render_template("index.html")
 
 
-# ---------------- MEMORY SUMMARY (optional future use) ----------------
-def update_memory_summary():
-    global memory_summary
-
-    last_msgs = conversation_history[-10:]
-
-    prompt = {
-        "role": "user",
-        "content": f"Summarize user info in 1-2 lines:\n{last_msgs}"
-    }
-
-    response = ollama.chat(
-        model="phi3:mini",
-        messages=[prompt]
-    )
-
-    memory_summary = response["message"]["content"]
-
-
-# ---------------- CHAT ROUTE (STREAMING) ----------------
 @app.route("/chat", methods=["POST"])
 def chat():
 
-    global conversation_history, memory_summary
-
     user_message = request.json.get("message")
 
-    # store user message
-    conversation_history.append({
-        "role": "user",
-        "content": user_message,
-        "time": datetime.now().strftime("%H:%M:%S")
-    })
+    # CONNECT DATABASE
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
 
-    # limit memory
-    if len(conversation_history) > 100:
-        conversation_history = conversation_history[-100:]
+    # CURRENT TIME
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # short context
-    recent_messages = conversation_history[-6:]
+    # SAVE USER MESSAGE
+    cursor.execute(
+        """
+        INSERT INTO messages (role, content, timestamp)
+        VALUES (?, ?, ?)
+        """,
+        ("user", user_message, current_time)
+    )
 
+    conn.commit()
+
+    # FETCH LAST 4 MESSAGES
+    cursor.execute("""
+        SELECT role, content
+        FROM messages
+        ORDER BY id DESC
+        LIMIT 4
+    """)
+
+    rows = cursor.fetchall()
+
+    # REVERSE TO MAINTAIN CHAT ORDER
+    rows.reverse()
+
+    # CONVERT TO OLLAMA FORMAT
+    recent_messages = []
+
+    for row in rows:
+        recent_messages.append({
+            "role": row[0],
+            "content": row[1]
+        })
+
+    # DEBUG OUTPUT
+    print("\n========== MESSAGES SENT TO MODEL ==========\n")
+
+    for msg in recent_messages:
+        print(msg)
+
+    print("\n===========================================\n")
+
+    # STREAMING RESPONSE FUNCTION
     def generate():
 
         bot_reply = ""
 
-        # build message stack safely
-        messages = [SYSTEM_PROMPT]
-
-        if memory_summary.strip():
-            messages.append({
-                "role": "system",
-                "content": f"Memory: {memory_summary}"
-            })
-
-        messages += recent_messages
-
         response = ollama.chat(
             model="phi3:mini",
-            messages=messages,
+            messages=[SYSTEM_PROMPT] + recent_messages,
             stream=True,
-            options={"num_predict": 120}
+            options={
+                "num_predict": 60
+            }
         )
 
         for chunk in response:
@@ -100,49 +122,51 @@ def chat():
             content = chunk.get("message", {}).get("content", "")
 
             if content:
+
                 bot_reply += content
+
                 yield content
 
-        # store assistant response
-        conversation_history.append({
-            "role": "assistant",
-            "content": bot_reply,
-            "time": datetime.now().strftime("%H:%M:%S")
-        })
+        # ASSISTANT TIMESTAMP
+        assistant_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # save memory
-        with open(MEMORY_FILE, "w") as f:
-            json.dump(conversation_history, f, indent=4)
+        # SAVE BOT RESPONSE
+        cursor.execute(
+            """
+            INSERT INTO messages (role, content, timestamp)
+            VALUES (?, ?, ?)
+            """,
+            ("assistant", bot_reply, assistant_time)
+        )
 
-        # update memory occasionally
-        if len(conversation_history) % 10 == 0:
-            update_memory_summary()
+        conn.commit()
+        conn.close()
 
     return Response(
         generate(),
-        mimetype="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no"
-        }
+        content_type="text/plain"
     )
 
 
-# ---------------- CLEAR MEMORY ----------------
-@app.route("/clear", methods=["GET"])
+# CLEAR DATABASE MEMORY
+@app.route("/clear")
 def clear_memory():
 
-    global conversation_history, memory_summary
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
 
-    conversation_history = [SYSTEM_PROMPT]
-    memory_summary = ""
+    cursor.execute("DELETE FROM messages")
 
-    with open(MEMORY_FILE, "w") as f:
-        json.dump(conversation_history, f, indent=4)
+    conn.commit()
+    conn.close()
 
-    return {"status": "Memory Cleared Successfully"}
+    return {
+        "status": "Memory Cleared Successfully"
+    }
 
 
-# ---------------- RUN ----------------
+# INITIALIZE DATABASE
+init_db()
+
 if __name__ == "__main__":
-    app.run(debug=False, threaded=True)
+    app.run(debug=False)
