@@ -25,6 +25,7 @@ As the project progresses, the chatbot is being enhanced using local LLM technol
 - JSON
 - Git & GitHub
 - Ollama (in progress)
+- SQLite
 
 ## Learning Objectives
 This project is part of a continuous learning journey focused on:
