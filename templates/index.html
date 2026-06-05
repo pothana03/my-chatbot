@@ -148,6 +148,31 @@
 
     const messages = document.getElementById("chatMessages");
 
+// SESSION ID
+let sessionId = localStorage.getItem("session_id");
+
+async function createNewSession() {
+
+    const response = await fetch(
+        "/new_session",
+        {
+            method: "POST"
+        }
+    );
+
+    const data = await response.json();
+
+    sessionId = data.session_id;
+
+    localStorage.setItem(
+        "session_id",
+        sessionId
+    );
+}
+
+if (!sessionId) {
+    createNewSession();
+}
 
     input.addEventListener("keypress", function(e){
 
@@ -192,8 +217,9 @@
                 "Content-Type":"application/json"
             },
 
-            body:JSON.stringify({
-                message:userText
+            body: JSON.stringify({
+                message: userText,
+                session_id: sessionId
             })
 
         });
